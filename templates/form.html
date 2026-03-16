@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+{% block title %}Analyse a Token{% endblock %}
+
+{% block content %}
+<div style="max-width:820px;">
+
+<div style="margin-bottom:28px;">
+  <h1>{% if prefill %}Review &amp; Complete{% else %}Analyse a Token{% endif %}</h1>
+  <p class="subtitle">Fill in what you know. Unknown fields are scored conservatively and flagged. The more data you provide, the more reliable the score.</p>
+</div>
+
+{% set quick_mode = request.args.get('quick') == 'true' %}
+{% set quick_message = request.args.get('message', '') %}
+
+{% if error %}
+<div style="padding:14px 16px; background:#2a08082a; border:1px solid #ef535060; border-radius:8px; color:#ffaaaa; font-size:13px; margin-bottom:20px;">
+  {{ error }}
+</div>
+{% endif %}
+
+{% if quick_mode %}
+<div id="quick-banner" style="padding:16px 18px; background:#2a220020; border:1px solid #ffd54f40;
+     border-radius:8px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+  <div>
+    <div style="color:var(--warn); font-weight:700; font-size:13px; margin-bottom:4px;">
+      ⚡ Quick Mode — 8 key fields only
+    </div>
+    <div style="color:var(--text2); font-size:12px;">{{ quick_message or "Answer a few questions to get your score." }}</div>
+  </div>
+  <button type="button" onclick="showFullForm()"
+    style="background:var(--bg3); border:1px solid var(--border2); color:var(--text2);
+           padding:8px 16px; border-radius:6px; font-size:12px; cursor:pointer;
+           font-family:inherit; white-space:nowrap; font-weight:600;">
+    Show full form
+  </button>
+</div>
+{% endif %}
+
+{% if scrape_meta %}
+<div style="padding:14px 16px; background:#003d3020; border:1px solid #00d4aa40; border-radius:8px; margin-bottom:20px; font-size:13px;">
+  {% if scrape_meta.get("prefill_source") == "existing" %}
+  <div style="display:flex; align-items:center; gap:10px;">
+    <span style="color:var(--accent); font-weight:700;">✓ Pre-filled from existing project data</span>
+    <span style="color:var(--text3);">Review and add anything that's missing or has changed.</span>
+  </div>
+  {% else %}
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+    <span style="color:var(--accent); font-weight:700;">✓ Auto-extracted from blurb</span>
+    <span style="color:var(--text3);">{{ scrape_meta.get('completeness_pct', 0) }}% of scored fields found</span>
+  </div>
+  {% if scrape_meta.get('fields_found') %}
+  <div style="font-size:12px; color:var(--text2); margin-bottom:6px;">
+    Found: {% for f in scrape_meta.fields_found %}<span style="background:var(--bg3); padding:2px 8px; border-radius:3px; margin-right:4px; margin-bottom:4px; display:inline-block;">{{ f }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if scrape_meta.get('fields_missing') %}
+  <div style="font-size:12px; color:#ff8a65;">
+    Still needed: {% for f in scrape_meta.fields_missing %}<span style="background:#3d1a0020; padding:2px 8px; border-radius:3px; margin-right:4px; margin-bottom:4px; display:inline-block; border:1px solid #ff8a6530;">{{ f }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if scrape_meta.get('urls_fetched') %}
+  <div style="font-size:11px; color:var(--text3); margin-top:8px;">
+    Pages scraped: {% for u in scrape_meta.urls_fetched %}{{ u }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
+<div id="loading-screen" style="display:none; text-align:center; padding:60px 20px;">
+  <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--accent); margin-bottom:24px; letter-spacing:0.1em;">
+    ANALYSING PROJECT
+  </div>
+  <div style="width:100%; max-width:400px; margin:0 auto 24px; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden;">
+    <div id="progress-bar" style="height:100%; width:0%; background:var(--accent); border-radius:2px; transition:width 0.5s ease;"></div>
+  </div>
+  <div id="progress-label" style="font-size:12px; color:var(--text2); margin-bottom:8px;">Scoring project...</div>
+  <div style="font-size:11px; color:var(--text3);">This takes 10–30 seconds. Do not refresh.</div>
+</div>
+
+<div id="analyser-form-wrap">
+<form method="POST" action="/analyse" id="analyser-form">
+
+  <!-- SECTION 1: Project and Token Info -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-accent" style="background:#ff8a65;"></div>
+      <div>
+        <h2 style="margin:0; color:#ff8a65;">Launch Structure &amp; Token Info</h2>
+        <div style="font-size:11px; color:var(--text3); margin-top:2px;">15 points</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Project / Agent Name <span style="color:var(--danger);">*</span></label>
+        <input type="text" name="agent_name" placeholder="e.g. Felix" required value="{{ prefill.get('agent_name', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Token Address</label>
+        <input type="text" name="token_address" placeholder="0x..." value="{{ prefill.get('token_address', '') }}" style="font-family:'IBM Plex Mono',monospace; font-size:13px;">
+      </div>
+      <div class="form-group">
+        <label>Launch Platform</label>
+        <select name="launch_platform">
+          <option value="">Unknown</option>
+          <option value="clanker" {% if prefill.get('launch_platform') == 'clanker' %}selected{% endif %}>Clanker</option>
+          <option value="bankr" {% if prefill.get('launch_platform') == 'bankr' %}selected{% endif %}>Bankr</option>
+          <option value="virtuals" {% if prefill.get('launch_platform') == 'virtuals' %}selected{% endif %}>Virtuals Protocol</option>
+          <option value="uniswap_raw" {% if prefill.get('launch_platform') == 'uniswap_raw' %}selected{% endif %}>Uniswap Raw</option>
+          <option value="other" {% if prefill.get('launch_platform') == 'other' %}selected{% endif %}>Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>LP Lock Until (date)</label>
+        <input type="date" name="lp_lock_until" value="{{ prefill.get('lp_lock_until', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Total Supply</label>
+        <input type="number" name="total_supply" placeholder="e.g. 1000000000" value="{{ prefill.get('total_supply', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Team Allocation (%)</label>
+        <input type="number" name="team_allocation_pct" placeholder="0" min="0" max="100" step="0.1" value="{{ prefill.get('team_allocation_pct', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Top 10 Wallet % (non-LP)</label>
+        <input type="number" name="top_10_wallet_pct" placeholder="e.g. 12" min="0" max="100" step="0.1" value="{{ prefill.get('top_10_wallet_pct', '') }}">
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <label class="checkbox-label">
+        <input type="checkbox" name="lp_locked" {% if prefill.get('lp_locked') %}checked{% endif %}>
+        <span>LP is locked</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="mint_function_active" {% if prefill.get('mint_function_active') %}checked{% endif %}>
+        <span>Mint function still active</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="presale_conducted" {% if prefill.get('presale_conducted') %}checked{% endif %}>
+        <span>Presale was conducted</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- SECTION 2: Revenue and Value Accrual -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-accent" style="background:#00d4aa;"></div>
+      <div>
+        <h2 style="margin:0;">Revenue &amp; Value Accrual</h2>
+        <div style="font-size:11px; color:var(--text3); margin-top:2px;">25 points</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Revenue Dashboard URL</label>
+        <input type="text" name="revenue_dashboard_url" placeholder="https://..." value="{{ prefill.get('revenue_dashboard_url', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Value Accrual Type</label>
+        <select name="value_accrual_type">
+          <option value="">Unknown</option>
+          <option value="buyback_burn" {% if prefill.get('value_accrual_type') == 'buyback_burn' %}selected{% endif %}>Buyback and Burn</option>
+          <option value="staking" {% if prefill.get('value_accrual_type') == 'staking' %}selected{% endif %}>Staking</option>
+          <option value="governance" {% if prefill.get('value_accrual_type') == 'governance' %}selected{% endif %}>Governance</option>
+          <option value="none" {% if prefill.get('value_accrual_type') == 'none' %}selected{% endif %}>None</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Burn Address</label>
+        <input type="text" name="burn_address" placeholder="0x000...dEaD" value="{{ prefill.get('burn_address', '') }}" style="font-family:'IBM Plex Mono',monospace; font-size:13px;">
+      </div>
+      <div class="form-group">
+        <label>Burn Transactions (30d)</label>
+        <input type="number" name="burn_tx_count_30d" placeholder="e.g. 12" min="0" value="{{ prefill.get('burn_tx_count_30d', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Treasury Total (USD)</label>
+        <input type="number" name="treasury_total_usd" placeholder="e.g. 50000" value="{{ prefill.get('treasury_total_usd', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Treasury Dashboard URL</label>
+        <input type="text" name="treasury_dashboard_url" placeholder="https://..." value="{{ prefill.get('treasury_dashboard_url', '') }}">
+      </div>
+      <div class="form-group col-span-2">
+        <label>Treasury Wallet Addresses</label>
+        <input type="text" name="treasury_wallet_addresses" placeholder="0x... comma separated" value="{{ ', '.join(prefill.get('treasury_wallet_addresses', [])) if prefill.get('treasury_wallet_addresses') else '' }}">
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <label class="checkbox-label">
+        <input type="checkbox" name="revenue_verified" {% if prefill.get('revenue_verified') %}checked{% endif %}>
+        <span>Revenue independently verifiable</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="revenue_dashboard_live" {% if prefill.get('revenue_dashboard_live') %}checked{% endif %}>
+        <span>Dashboard is live and updating</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- SECTION 3: Agent and Product -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-accent" style="background:#4fc3f7;"></div>
+      <div>
+        <h2 style="margin:0; color:#4fc3f7;">Agent &amp; Product</h2>
+        <div style="font-size:11px; color:var(--text3); margin-top:2px;">22 points</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Agent Description</label>
+      <textarea name="agent_description" rows="3" placeholder="What does the agent do? What is its actual function and output?" style="resize:vertical;">{{ prefill.get('agent_description', '') }}</textarea>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Tech Stack</label>
+        <div class="field-hint">Comma-separated: e.g. openclaw, multi-agent, custom</div>
+        <input type="text" name="agent_tech_stack" placeholder="e.g. openclaw, multi-agent, custom" value="{{ ', '.join(prefill.get('agent_tech_stack', [])) if prefill.get('agent_tech_stack') else '' }}">
+      </div>
+      <div class="form-group">
+        <label>Subagent Count</label>
+        <input type="number" name="agent_subagent_count" placeholder="0" min="0" value="{{ prefill.get('agent_subagent_count', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Infrastructure</label>
+        <select name="agent_infrastructure">
+          <option value="">Unknown</option>
+          <option value="cloud" {% if prefill.get('agent_infrastructure') == 'cloud' %}selected{% endif %}>Cloud</option>
+          <option value="physical_hardware" {% if prefill.get('agent_infrastructure') == 'physical_hardware' %}selected{% endif %}>Physical Hardware</option>
+          <option value="unknown" {% if prefill.get('agent_infrastructure') == 'unknown' %}selected{% endif %}>Unknown</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Live Products Count</label>
+        <input type="number" name="product_count_live" placeholder="0" min="0" value="{{ prefill.get('product_count_live', '') }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Products (JSON)</label>
+      <div class="field-hint">JSON array: [{"name":"Product Name","price":29,"is_live":true}, ...]</div>
+      <textarea name="products" rows="4" placeholder='[{"name":"Product Name","price":29,"is_live":true}]' style="font-family:&apos;IBM Plex Mono&apos;,monospace; font-size:12px; resize:vertical;">{{ prefill.get('products', []) | tojson if prefill.get('products') else '' }}</textarea>
+    </div>
+  </div>
+
+  <!-- SECTION 4: Operator and Accountability -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-accent" style="background:#ffd54f;"></div>
+      <div>
+        <h2 style="margin:0; color:#ffd54f;">Operator &amp; Accountability</h2>
+        <div style="font-size:11px; color:var(--text3); margin-top:2px;">18 points</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Operator Name</label>
+        <input type="text" name="operator_name" placeholder="e.g. Nat Eliason" value="{{ prefill.get('operator_name', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Communication Frequency</label>
+        <select name="operator_communication_frequency">
+          <option value="">Unknown</option>
+          <option value="daily" {% if prefill.get('operator_communication_frequency') == 'daily' %}selected{% endif %}>Daily</option>
+          <option value="weekly" {% if prefill.get('operator_communication_frequency') == 'weekly' %}selected{% endif %}>Weekly</option>
+          <option value="biweekly" {% if prefill.get('operator_communication_frequency') == 'biweekly' %}selected{% endif %}>Biweekly</option>
+          <option value="monthly" {% if prefill.get('operator_communication_frequency') == 'monthly' %}selected{% endif %}>Monthly</option>
+          <option value="inactive" {% if prefill.get('operator_communication_frequency') == 'inactive' %}selected{% endif %}>Inactive</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Updates Last 30 Days</label>
+        <input type="number" name="updates_last_30d" placeholder="e.g. 8" min="0" value="{{ prefill.get('updates_last_30d', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Last Product Update</label>
+        <input type="date" name="last_product_update" value="{{ prefill.get('last_product_update', '') }}">
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <label class="checkbox-label">
+        <input type="checkbox" name="operator_real_name_known" {% if prefill.get('operator_real_name_known') %}checked{% endif %}>
+        <span>Real name publicly known</span>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="operator_addresses_failures" {% if prefill.get('operator_addresses_failures') %}checked{% endif %}>
+        <span>Operator publicly discusses setbacks and losses</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- SECTION 5: Community and Momentum -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-accent" style="background:#ce93d8;"></div>
+      <div>
+        <h2 style="margin:0; color:#ce93d8;">Community &amp; Momentum</h2>
+        <div style="font-size:11px; color:var(--text3); margin-top:2px;">Activity &amp; Ecosystem — 12 points</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Community Engagement Quality</label>
+        <select name="community_engagement_quality">
+          <option value="">Unknown</option>
+          <option value="high" {% if prefill.get('community_engagement_quality') == 'high' %}selected{% endif %}>High — active, genuine, operator interacts</option>
+          <option value="moderate" {% if prefill.get('community_engagement_quality') == 'moderate' %}selected{% endif %}>Moderate</option>
+          <option value="low" {% if prefill.get('community_engagement_quality') == 'low' %}selected{% endif %}>Low — mostly broadcasting</option>
+          <option value="bot_dominated" {% if prefill.get('community_engagement_quality') == 'bot_dominated' %}selected{% endif %}>Bot Dominated</option>
+          <option value="dead" {% if prefill.get('community_engagement_quality') == 'dead' %}selected{% endif %}>Dead</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Project Age (days)</label>
+        <input type="number" name="project_age_days" placeholder="e.g. 45" min="0" value="{{ prefill.get('project_age_days', '') }}">
+      </div>
+      <div class="form-group col-span-2">
+        <label>Listed on Aggregators</label>
+        <div class="field-hint">Comma-separated: e.g. coingecko, dexscreener</div>
+        <input type="text" name="listed_on_aggregators" placeholder="e.g. coingecko, dexscreener" value="{{ ', '.join(prefill.get('listed_on_aggregators', [])) if prefill.get('listed_on_aggregators') else '' }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: On-Chain Health -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-accent" style="background:#80cbc4;"></div>
+      <div>
+        <h2 style="margin:0; color:#80cbc4;">On-Chain Health</h2>
+        <div style="font-size:11px; color:var(--text3); margin-top:2px;">8 points</div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Market Cap (USD)</label>
+        <input type="number" name="market_cap_usd" placeholder="e.g. 800000" value="{{ prefill.get('market_cap_usd', '') }}">
+      </div>
+      <div class="form-group">
+        <label>24h Volume (USD)</label>
+        <input type="number" name="volume_24h_usd" placeholder="e.g. 280000" value="{{ prefill.get('volume_24h_usd', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Price at ATH (USD)</label>
+        <input type="number" name="price_ath_usd" placeholder="e.g. 0.000012" step="any" value="{{ prefill.get('price_ath_usd', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Current Price (USD)</label>
+        <input type="number" name="price_current_usd" placeholder="e.g. 0.000010" step="any" value="{{ prefill.get('price_current_usd', '') }}">
+      </div>
+      <div class="form-group">
+        <label>Holder Count</label>
+        <input type="number" name="holder_count" placeholder="e.g. 1200" min="0" value="{{ prefill.get('holder_count', '') }}">
+      </div>
+      <div class="form-group">
+        <label>7-Day Volume Trend</label>
+        <select name="volume_trend_7d">
+          <option value="">Unknown</option>
+          <option value="increasing" {% if prefill.get('volume_trend_7d') == 'increasing' %}selected{% endif %}>Increasing</option>
+          <option value="stable" {% if prefill.get('volume_trend_7d') == 'stable' %}selected{% endif %}>Stable</option>
+          <option value="declining" {% if prefill.get('volume_trend_7d') == 'declining' %}selected{% endif %}>Declining</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUBMIT -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 0; flex-wrap:wrap; gap:16px;">
+    <div style="font-size:12px; color:var(--text3); max-width:500px; line-height:1.6;">
+      Unknown fields are scored conservatively. Your submission merges with existing data — you can improve the score by providing missing info.
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
+      <div id="credit-notice" style="font-size:12px; color:var(--warn); display:none;">
+        ⚠️ No credits remaining. This will use your free daily query.
+      </div>
+      <input type="hidden" name="research_mode" value="{{ 'true' if scrape_meta.get('research_confidence') else 'false' }}">
+      <button type="submit" class="btn btn-primary">
+        Generate Score →
+      </button>
+    </div>
+  </div>
+
+</form>
+</div>
+</div>
+
+<script>
+fetch("/api/balance").then(r=>r.json()).then(data=>{
+  if (data.connected && data.balance === 0) {
+    document.getElementById("credit-notice").style.display = "block";
+  }
+});
+
+// Quick mode — hide non-quick fields
+const QUICK_FIELDS = new Set([
+  "launch_platform", "lp_locked", "product_count_live",
+  "revenue_verified", "revenue_dashboard_url",
+  "operator_name", "operator_real_name_known", "last_product_update"
+]);
+
+function applyQuickMode() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("quick") !== "true") return;
+
+  // Mark all form-group divs that don't contain a quick field
+  document.querySelectorAll(".form-group").forEach(group => {
+    const inputs = group.querySelectorAll("input[name], select[name], textarea[name], input[type=checkbox]");
+    const hasQuick = Array.from(inputs).some(el => QUICK_FIELDS.has(el.name));
+    if (!hasQuick) {
+      group.setAttribute("data-quick-hide", "1");
+      group.style.display = "none";
+    }
+  });
+
+  // Hide entire cards (sections) that have no visible form-groups left
+  document.querySelectorAll(".card").forEach(card => {
+    const groups = card.querySelectorAll(".form-group");
+    const allHidden = groups.length > 0 && Array.from(groups).every(g => g.getAttribute("data-quick-hide"));
+    // Also hide checkbox-labels for non-quick checkboxes
+    card.querySelectorAll(".checkbox-label").forEach(label => {
+      const cb = label.querySelector("input[type=checkbox]");
+      if (cb && !QUICK_FIELDS.has(cb.name)) {
+        label.setAttribute("data-quick-hide", "1");
+        label.style.display = "none";
+      }
+    });
+    if (allHidden) {
+      card.setAttribute("data-quick-hide", "1");
+      card.style.display = "none";
+    }
+  });
+}
+
+function showFullForm() {
+  document.querySelectorAll("[data-quick-hide]").forEach(el => {
+    el.style.display = "";
+  });
+  const banner = document.getElementById("quick-banner");
+  if (banner) banner.style.display = "none";
+}
+
+applyQuickMode();
+
+document.getElementById('analyser-form').addEventListener('submit', function() {
+  document.getElementById('analyser-form-wrap').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'block';
+  startProgress();
+});
+
+function startProgress() {
+  const steps = [
+    [20, "Scoring project..."],
+    [50, "Generating analyst report..."],
+    [80, "Saving results..."],
+    [95, "Almost done..."],
+  ];
+  let i = 0;
+  const bar   = document.getElementById('progress-bar');
+  const label = document.getElementById('progress-label');
+
+  function nextStep() {
+    if (i >= steps.length) return;
+    const [pct, text] = steps[i];
+    bar.style.width   = pct + '%';
+    label.textContent = text;
+    i++;
+    const delay = i === 1 ? 1000 : i === 2 ? 8000 : 5000;
+    setTimeout(nextStep, delay);
+  }
+  nextStep();
+}
+</script>
+{% endblock %}

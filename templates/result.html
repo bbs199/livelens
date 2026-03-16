@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+{% block title %}{{ project.agent_name or project.name }} Analysis{% endblock %}
+
+{% macro score_context(category, points, max_points) %}
+  {% set pct = (points / max_points * 100) | int %}
+  {% if category == "Revenue Existence" %}
+    {% if pct >= 80 %}Multiple verified income streams confirmed.
+    {% elif pct >= 50 %}Some revenue evidence found, not fully verified.
+    {% elif pct >= 20 %}Minimal revenue signals, mostly unverified.
+    {% else %}No confirmed income streams found.{% endif %}
+  {% elif category == "Value Accrual" %}
+    {% if pct >= 80 %}Token holders directly benefit from revenue via burns or buybacks.
+    {% elif pct >= 50 %}Value accrual mechanism exists but execution is unverified.
+    {% elif pct >= 20 %}Weak or theoretical value accrual only.
+    {% else %}No mechanism for revenue to reach token holders.{% endif %}
+  {% elif category == "Treasury Transparency" %}
+    {% if pct >= 80 %}Treasury is public and verifiable on-chain.
+    {% elif pct >= 50 %}Partial treasury visibility — some data available.
+    {% elif pct >= 20 %}Treasury exists but size and usage are unknown.
+    {% else %}No treasury transparency whatsoever.{% endif %}
+  {% elif category == "Agent Existence" %}
+    {% if pct >= 80 %}Strong evidence of real autonomous agent activity.
+    {% elif pct >= 50 %}Some agent activity confirmed, limited scope.
+    {% elif pct >= 20 %}Minimal evidence of genuine autonomous operation.
+    {% else %}No verifiable agent activity found.{% endif %}
+  {% elif category == "Product Reality" %}
+    {% if pct >= 80 %}Multiple live products users can buy or use today.
+    {% elif pct >= 50 %}At least one live product confirmed.
+    {% elif pct >= 20 %}Products claimed but not independently verified.
+    {% else %}No products found that users can access.{% endif %}
+  {% elif category == "Technical Sophistication" %}
+    {% if pct >= 80 %}Advanced multi-agent infrastructure with physical hardware.
+    {% elif pct >= 50 %}Moderate technical setup — standard agent framework.
+    {% elif pct >= 20 %}Basic or unspecified technical infrastructure.
+    {% else %}No meaningful technical infrastructure identified.{% endif %}
+  {% elif category == "Operator Identity" %}
+    {% if pct >= 80 %}Operator is publicly named with verifiable background.
+    {% elif pct >= 50 %}Operator is partially identified — pseudonymous but traceable.
+    {% elif pct >= 20 %}Operator identity unclear or unverifiable.
+    {% else %}Operator is completely anonymous.{% endif %}
+  {% elif category == "Skin in the Game" %}
+    {% if pct >= 80 %}Operator has significant reputational and financial stakes.
+    {% elif pct >= 50 %}Some operator commitment evident.
+    {% elif pct >= 20 %}Limited evidence of operator having stakes.
+    {% else %}No evidence operator has anything to lose.{% endif %}
+  {% elif category == "Launch Platform & LP" %}
+    {% if pct >= 80 %}Fair launch with permanently locked liquidity confirmed.
+    {% elif pct >= 50 %}Launch platform identified, LP status partially confirmed.
+    {% elif pct >= 20 %}Launch details unclear, LP lock unconfirmed.
+    {% else %}No launch platform or LP lock information found.{% endif %}
+  {% elif category == "Supply Distribution" %}
+    {% if pct >= 80 %}Fixed supply, no team allocation, no presale.
+    {% elif pct >= 50 %}Mostly clean distribution with minor concerns.
+    {% elif pct >= 20 %}Some concentration or allocation concerns.
+    {% else %}High concentration or insider allocation detected.{% endif %}
+  {% elif category == "Mechanic Sustainability" %}
+    {% if pct >= 80 %}Value accrual works even at low volume — multiple revenue sources.
+    {% elif pct >= 50 %}Mechanism functions but volume-dependent.
+    {% elif pct >= 20 %}Mechanism exists but untested in adverse conditions.
+    {% else %}No sustainable value accrual mechanism.{% endif %}
+  {% elif category == "Shipping Cadence" %}
+    {% if pct >= 80 %}Shipping actively — multiple updates in last 30 days.
+    {% elif pct >= 50 %}Recent activity — update within last 30 days.
+    {% elif pct >= 20 %}Infrequent updates — last activity over 30 days ago.
+    {% else %}No recent shipping activity found.{% endif %}
+  {% elif category == "Community Engagement" %}
+    {% if pct >= 80 %}Active genuine community — operator interacts regularly.
+    {% elif pct >= 50 %}Moderate engagement on at least one platform.
+    {% elif pct >= 20 %}Minimal engagement — mostly broadcasting.
+    {% else %}Dead or bot-dominated community.{% endif %}
+  {% elif category == "Ecosystem Integration" %}
+    {% if pct >= 80 %}Well integrated — multiple ecosystem collaborations.
+    {% elif pct >= 50 %}Some ecosystem presence confirmed.
+    {% elif pct >= 20 %}Minimal ecosystem integration found.
+    {% else %}No ecosystem integration identified.{% endif %}
+  {% elif category == "Volume/MCap Ratio" %}
+    {% if pct >= 80 %}Healthy trading volume relative to market cap.
+    {% elif pct >= 50 %}Moderate volume — some liquidity present.
+    {% elif pct >= 20 %}Low volume relative to market cap — liquidity concerns.
+    {% else %}Negligible trading volume.{% endif %}
+  {% elif category == "Holder Distribution" %}
+    {% if pct >= 80 %}Well distributed — no dangerous concentration.
+    {% elif pct >= 50 %}Moderate distribution with some concentration.
+    {% elif pct >= 20 %}Concentrated holdings — top wallets hold significant supply.
+    {% else %}Highly concentrated or unknown distribution.{% endif %}
+  {% elif category == "Price Trend" %}
+    {% if pct >= 80 %}Strong positive price trend over 7 days.
+    {% elif pct >= 50 %}Stable or mildly positive recent price action.
+    {% elif pct >= 20 %}Negative price trend over 7 days.
+    {% else %}Significant price decline or unknown trend.{% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+{% set r = score.result %}
+{% set report = score.get("report", {}) %}
+{% set grade = r.grade %}
+{% set grade_colors = {'A': '#00d4aa', 'B': '#4fc3f7', 'C': '#ffd54f', 'D': '#ff8a65', 'F': '#ef5350'} %}
+{% set gcolor = grade_colors.get(grade, '#888') %}
+{% set narrative = r.get("narrative_context", "YELLOW") %}
+{% set score = r.total_score %}
+{% if score >= 85 %}{% set score_color = "#16a34a" %}
+{% elif score >= 70 %}{% set score_color = "#3b82f6" %}
+{% elif score >= 55 %}{% set score_color = "#ca8a04" %}
+{% elif score >= 40 %}{% set score_color = "#d97706" %}
+{% else %}{% set score_color = "#e53e3e" %}{% endif %}
+
+<!-- Breadcrumb + header -->
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px; gap:20px; flex-wrap:wrap;">
+  <div>
+    <div style="font-size:12px; color:var(--text3); margin-bottom:6px; font-family:'IBM Plex Mono',monospace;">
+      <a href="/" style="color:var(--text3); text-decoration:none;">Dashboard</a> / {{ project.agent_name or project.name }}
+    </div>
+    <h1>{{ project.agent_name or project.name }}</h1>
+    {% if project.token_address %}
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text3); margin-top:4px;">
+      {{ project.token_address }}
+    </div>
+    {% endif %}
+    <div style="display:flex; align-items:center; gap:12px; margin-top:8px; flex-wrap:wrap;">
+      <span style="font-size:12px; color:var(--text2); padding:3px 10px; background:var(--bg3); border-radius:4px; border:1px solid var(--border2);">Base</span>
+      <span class="conf-badge conf-{{ r.confidence }}">{{ r.confidence }} CONFIDENCE</span>
+      <span style="font-size:12px; color:var(--text3);">{{ sub_count }} submission{{ 's' if sub_count != 1 else '' }}</span>
+    </div>
+  </div>
+  <a href="/analyse?project_id={{ project.id }}" class="btn btn-secondary">+ Add / Update Data</a>
+</div>
+
+<!-- Score Hero -->
+<div class="card" style="margin-bottom:24px; border-color:{{ gcolor }}40;">
+  <div style="display:flex; align-items:center; gap:28px; flex-wrap:wrap;">
+    <div class="score-circle" style="border-color:{{ gcolor }}; color:{{ gcolor }};">
+      <div class="score-number" style="color:{{ gcolor }};">{{ r.total_score }}</div>
+      <div class="score-label">/ 100</div>
+    </div>
+    <div class="grade-badge grade-{{ grade }}" style="width:60px; height:60px; font-size:28px;">{{ grade }}</div>
+    <div style="flex:1; min-width:200px;">
+      <div style="font-size:13px; color:var(--text2); margin-bottom:8px;">
+        Score: <strong style="color:{{ gcolor }};">{{ r.total_score }} / 100</strong>
+        &nbsp;·&nbsp; <span style="color:var(--text3);">{{ r.confidence }} confidence</span>
+      </div>
+      {% set grade_labels = {
+        'A': 'Strong fundamentals — investable with conviction',
+        'B': 'Solid project, minor gaps',
+        'C': 'Moderate risk — verify red flags before entry',
+        'D': 'Weak fundamentals — high failure risk',
+        'F': 'Structural fail — do not invest'
+      } %}
+      <div style="font-size:15px; color:{{ gcolor }}; font-weight:600;">{{ grade_labels.get(grade, '') }}</div>
+      <div style="width:100%; background:var(--bg3); border-radius:4px; height:8px; margin-top:12px;">
+        <div style="width:{{ score }}%; background:{{ score_color }}; border-radius:4px; height:8px; transition:width 0.6s ease;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Narrative Overlay Traffic Light -->
+{% if narrative == "GREEN" %}
+<div style="padding:10px 16px; border-radius:7px; margin-bottom:20px; background:#003d3020; border:1px solid #00d4aa40; display:inline-flex; align-items:center; gap:10px;">
+  <span style="width:8px; height:8px; border-radius:50%; background:#00d4aa; flex-shrink:0;"></span>
+  <span style="font-size:12px; font-weight:700; color:#00d4aa; letter-spacing:0.06em;">AI Agent Narrative: Tailwind</span>
+</div>
+{% elif narrative == "RED" %}
+<div style="padding:10px 16px; border-radius:7px; margin-bottom:20px; background:#2a08082a; border:1px solid #ef535040; display:inline-flex; align-items:center; gap:10px;">
+  <span style="width:8px; height:8px; border-radius:50%; background:#ef5350; flex-shrink:0;"></span>
+  <span style="font-size:12px; font-weight:700; color:#ef5350; letter-spacing:0.06em;">AI Agent Narrative: Headwind</span>
+</div>
+{% else %}
+<div style="padding:10px 16px; border-radius:7px; margin-bottom:20px; background:#2a220020; border:1px solid #ffd54f40; display:inline-flex; align-items:center; gap:10px;">
+  <span style="width:8px; height:8px; border-radius:50%; background:#ffd54f; flex-shrink:0;"></span>
+  <span style="font-size:12px; font-weight:700; color:#ffd54f; letter-spacing:0.06em;">AI Agent Narrative: Neutral</span>
+</div>
+{% endif %}
+
+<!-- Analyst Report -->
+{% if report and report.get('verdict') %}
+<div class="card" style="margin-bottom:24px; border-color:#1a3450;">
+  <div class="card-header">
+    <div class="card-accent" style="background:var(--accent2);"></div>
+    <div style="flex:1;">
+      <h2 style="margin:0; color:var(--accent2);">Analyst Report</h2>
+      <div style="font-size:11px; color:var(--text3); margin-top:2px;">AI-generated from scoring data</div>
+    </div>
+  </div>
+
+  <!-- 2x2 Report Grid -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:20px 0;">
+    <!-- Verdict -->
+    <div style="padding:18px 20px; background:var(--bg2); border-radius:8px; border-left:3px solid #16a34a;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:#16a34a; text-transform:uppercase; margin-bottom:8px;">Verdict</div>
+      <p style="font-size:13px; color:var(--text); line-height:1.7; margin:0;">{{ report.verdict }}</p>
+    </div>
+    <!-- Agent Assessment -->
+    <div style="padding:18px 20px; background:var(--bg2); border-radius:8px; border-left:3px solid #3b82f6;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:#3b82f6; text-transform:uppercase; margin-bottom:8px;">Agent Assessment</div>
+      <p style="font-size:13px; color:var(--text2); line-height:1.7; margin:0;">{{ report.agent_assessment }}</p>
+    </div>
+    <!-- Revenue Reality -->
+    <div style="padding:18px 20px; background:var(--bg2); border-radius:8px; border-left:3px solid #d97706;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:#d97706; text-transform:uppercase; margin-bottom:8px;">Revenue Reality</div>
+      <p style="font-size:13px; color:var(--text2); line-height:1.7; margin:0;">{{ report.revenue_reality }}</p>
+    </div>
+    <!-- Key Risk -->
+    <div style="padding:18px 20px; background:var(--bg2); border-radius:8px; border-left:3px solid #e53e3e;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:#e53e3e; text-transform:uppercase; margin-bottom:8px;">Key Risk</div>
+      <p style="font-size:13px; color:var(--text2); line-height:1.7; margin:0;">{{ report.key_risk }}</p>
+    </div>
+  </div>
+
+  <!-- What Would Make This Better — full width -->
+  <div style="padding:18px 20px; background:var(--bg2); border-radius:8px; border-left:3px solid var(--text3); margin-bottom:8px;">
+    <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text3); text-transform:uppercase; margin-bottom:8px;">What Would Make This Better</div>
+    <p style="font-size:13px; color:var(--text2); line-height:1.7; margin:0;">{{ report.what_would_make_this_better }}</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Red Flags -->
+<!-- Category Group Summary Grid -->
+{% set category_scores = r.category_scores %}
+{% set rev_score      = (category_scores.get("Revenue Existence", 0) + category_scores.get("Value Accrual", 0) + category_scores.get("Treasury Transparency", 0)) %}
+{% set agent_score    = (category_scores.get("Agent Existence", 0) + category_scores.get("Product Reality", 0) + category_scores.get("Technical Sophistication", 0)) %}
+{% set operator_score = (category_scores.get("Operator Identity", 0) + category_scores.get("Skin in the Game", 0)) %}
+{% set launch_score   = (category_scores.get("Launch Platform & LP", 0) + category_scores.get("Supply Distribution", 0) + category_scores.get("Mechanic Sustainability", 0)) %}
+{% set activity_score = (category_scores.get("Shipping Cadence", 0) + category_scores.get("Community Engagement", 0) + category_scores.get("Ecosystem Integration", 0)) %}
+{% set onchain_score  = (category_scores.get("Volume/MCap Ratio", 0) + category_scores.get("Holder Distribution", 0) + category_scores.get("Price Trend", 0)) %}
+
+{% set groups = [
+  ("Revenue",   rev_score,      25, "#00d4aa"),
+  ("Agent",     agent_score,    22, "#4fc3f7"),
+  ("Operator",  operator_score, 14, "#ff8a65"),
+  ("Launch",    launch_score,   15, "#ffd54f"),
+  ("Activity",  activity_score, 12, "#ce93d8"),
+  ("On-Chain",  onchain_score,  8,  "#80cbc4"),
+] %}
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:20px 0;">
+  {% for group_name, group_pts, group_max, group_color in groups %}
+  {% set group_pct = ((group_pts / group_max) * 100) | round | int %}
+  {% if group_pct >= 85 %}{% set gc = "#16a34a" %}
+  {% elif group_pct >= 70 %}{% set gc = "#3b82f6" %}
+  {% elif group_pct >= 55 %}{% set gc = "#ca8a04" %}
+  {% elif group_pct >= 40 %}{% set gc = "#d97706" %}
+  {% else %}{% set gc = "#e53e3e" %}{% endif %}
+  <div style="padding:12px 14px; background:var(--bg3); border-radius:8px; border:1px solid var(--border);">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;">
+      <span style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{{ group_color }};">{{ group_name }}</span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700; color:{{ gc }};">{{ group_pts }}<span style="color:var(--text3); font-weight:400; font-size:11px;"> / {{ group_max }}</span></span>
+    </div>
+    <div style="width:100%; background:var(--bg2); border-radius:3px; height:5px;">
+      <div style="width:{{ group_pct }}%; background:{{ gc }}; border-radius:3px; height:5px; transition:width 0.5s ease;"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if r.red_flags %}
+<div class="card" style="margin-bottom:24px;
+  {% set has_crit = r.red_flags | selectattr('level', 'eq', 'CRITICAL') | list | length > 0 %}
+  {% set has_warn = r.red_flags | selectattr('level', 'eq', 'WARNING')  | list | length > 0 %}
+  {% if has_crit %}border-color:#ef535040;{% elif has_warn %}border-color:#ffd54f40;{% endif %}">
+  <div class="card-header">
+    <div class="card-accent" style="background:
+      {%- if r.red_flags | selectattr('level', 'eq', 'CRITICAL') | list | length > 0 %}var(--danger)
+      {%- elif r.red_flags | selectattr('level', 'eq', 'WARNING') | list | length > 0 %}var(--warn)
+      {%- else %}var(--text3){% endif %};"></div>
+    <h2 style="margin:0; color:
+      {%- if r.red_flags | selectattr('level', 'eq', 'CRITICAL') | list | length > 0 %}var(--danger)
+      {%- elif r.red_flags | selectattr('level', 'eq', 'WARNING') | list | length > 0 %}var(--warn)
+      {%- else %}var(--text2){% endif %};">
+      Flags ({{ r.red_flags | length }})
+    </h2>
+  </div>
+  {% for flag in r.red_flags %}
+  <div class="flag flag-{{ flag.level }}">
+    <div class="flag-label">{{ flag.get('id', flag.level) if flag is mapping else flag.id }}</div>
+    <div>{{ flag.text if flag is mapping else flag.text }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Category Breakdown -->
+<div class="card" style="margin-bottom:24px;">
+  <div class="card-header">
+    <div class="card-accent"></div>
+    <h2 style="margin:0;">Category Breakdown</h2>
+  </div>
+
+  {% set category_meta = [
+    ("Revenue Existence",        10, "#00d4aa"),
+    ("Value Accrual",             8, "#00d4aa"),
+    ("Treasury Transparency",     7, "#00d4aa"),
+    ("Agent Existence",          10, "#4fc3f7"),
+    ("Product Reality",           8, "#4fc3f7"),
+    ("Technical Sophistication",  4, "#4fc3f7"),
+    ("Operator Identity",         8, "#ff8a65"),
+    ("Skin in the Game",          6, "#ff8a65"),
+    ("Launch Platform & LP",      7, "#ffd54f"),
+    ("Supply Distribution",       4, "#ffd54f"),
+    ("Mechanic Sustainability",   4, "#ffd54f"),
+    ("Shipping Cadence",          5, "#ce93d8"),
+    ("Community Engagement",      4, "#ce93d8"),
+    ("Ecosystem Integration",     3, "#ce93d8"),
+    ("Volume/MCap Ratio",         3, "#80cbc4"),
+    ("Holder Distribution",       3, "#80cbc4"),
+    ("Price Trend",               2, "#80cbc4"),
+  ] %}
+
+  {% set category_descriptions = {
+    "Revenue Existence":        "Does the project have confirmed income streams?",
+    "Value Accrual":            "Do token holders benefit from revenue via burns or buybacks?",
+    "Treasury Transparency":    "Is treasury size and usage publicly visible?",
+    "Agent Existence":          "Is there evidence of real autonomous agent activity?",
+    "Product Reality":          "Are there live products users can buy or use today?",
+    "Technical Sophistication": "How advanced is the agent infrastructure?",
+    "Operator Identity":        "Is the operator publicly known and accountable?",
+    "Skin in the Game":         "Does the operator have reputational or financial stakes?",
+    "Launch Platform & LP":     "Fair launch with locked liquidity?",
+    "Supply Distribution":      "Is supply fairly distributed with no insider allocation?",
+    "Mechanic Sustainability":  "Can the value accrual mechanism survive a downturn?",
+    "Shipping Cadence":         "How frequently does the project ship updates?",
+    "Community Engagement":     "Is there genuine active community interaction?",
+    "Ecosystem Integration":    "Is the project integrated into the wider agent ecosystem?",
+    "Volume/MCap Ratio":        "Is daily trading volume healthy relative to market cap?",
+    "Holder Distribution":      "Is token ownership spread across many wallets?",
+    "Price Trend":              "Is the price trend positive over the past 7 days?",
+  } %}
+
+  <style>
+    .breakdown-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .breakdown-table th { font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--text3); padding:8px 8px 10px; border-bottom:1px solid var(--border2); text-align:left; }
+    .breakdown-table th.score-col { text-align:right; width:60px; }
+    .breakdown-table th.bar-col { width:120px; }
+    .breakdown-table td { padding:10px 8px; border-bottom:1px solid var(--bg3); vertical-align:middle; }
+    .breakdown-table tr:last-child td { border-bottom:none; }
+    .breakdown-table td.score-col { text-align:right; white-space:nowrap; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; }
+    @media (max-width:600px) {
+      .breakdown-bar-col, .breakdown-desc { display:none; }
+    }
+  </style>
+  <table class="breakdown-table">
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th class="score-col">Score</th>
+        <th class="bar-col breakdown-bar-col"></th>
+        <th>What this means</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for cat_name, max_pts, color in category_meta %}
+    {% set pts = r.category_scores.get(cat_name, 0) %}
+    {% set bar_pct = ((pts / max_pts) * 100) | round | int %}
+    {% if bar_pct >= 85 %}{% set bc = "#16a34a" %}
+    {% elif bar_pct >= 70 %}{% set bc = "#3b82f6" %}
+    {% elif bar_pct >= 55 %}{% set bc = "#ca8a04" %}
+    {% elif bar_pct >= 40 %}{% set bc = "#d97706" %}
+    {% else %}{% set bc = "#e53e3e" %}{% endif %}
+    {% set ctx = score_context(cat_name, pts, max_pts) | trim %}
+    <tr>
+      <td>
+        <span style="font-weight:600; color:var(--text);">{{ cat_name }}</span>
+        <div class="breakdown-desc" style="font-size:11px; color:var(--text3); margin-top:2px;">{{ category_descriptions.get(cat_name, "") }}</div>
+      </td>
+      <td class="score-col" style="color:{{ color }};">{{ pts }}<span style="color:var(--text3); font-weight:400;"> / {{ max_pts }}</span></td>
+      <td class="breakdown-bar-col" style="min-width:120px;">
+        <div style="width:100%; background:var(--bg3); border-radius:3px; height:6px;">
+          <div style="width:{{ bar_pct }}%; background:{{ bc }}; border-radius:3px; height:6px; transition:width 0.4s ease;"></div>
+        </div>
+      </td>
+      <td style="font-size:12px; color:var(--text3); line-height:1.5;">{{ ctx }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Disclaimer -->
+<div class="disclaimer">
+  <strong>Disclaimer:</strong>
+  Score based on information provided at time of submission.
+  Agent behaviour and revenue can change rapidly — always verify current state.
+  Narrative overlay is operator-set and updated manually.
+  This is not financial advice.
+</div>
+
+<!-- Improve this score -->
+<div style="margin-top:24px; padding:20px; background:var(--bg4); border-radius:10px; border:1px solid var(--border2); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+  <div>
+    <div style="font-size:14px; font-weight:600; margin-bottom:4px;">Know something we don't?</div>
+    <div style="font-size:12px; color:var(--text3);">Submit additional data to improve this score. {{ sub_count }} submission{{ 's' if sub_count != 1 else '' }} so far.</div>
+  </div>
+  <a href="/analyse?project_id={{ project.id }}" class="btn btn-primary">Add Data →</a>
+</div>
+
+{% endblock %}

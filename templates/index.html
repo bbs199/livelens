@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+{% if request.args.get('msg') == 'connect_wallet' %}
+<div style="background:#2a1a00; border:1px solid #d97706; border-radius:6px; padding:12px 16px; margin-bottom:20px; color:#d97706; font-size:13px;">
+  Connect your wallet to access analysis tools.
+</div>
+{% endif %}
+<div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:32px; gap:20px; flex-wrap:wrap;">
+  <div>
+    <h1>LiveLens</h1>
+    <p class="subtitle">Due diligence scores for live AI agent tokens on Base.</p>
+  </div>
+  <a href="/scrape" class="btn btn-primary" style="flex-shrink:0;">+ Analyse Token</a>
+</div>
+
+<!-- Scoring framework -->
+<div class="card" style="margin-bottom:28px;">
+  <div class="card-header">
+    <div class="card-accent"></div>
+    <h2 style="margin:0;">Scoring Framework</h2>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:12px;">
+    {% set cats = [
+      ("Revenue & Value Accrual", "25pts", "#00d4aa"),
+      ("Agent Reality & Product", "22pts", "#4fc3f7"),
+      ("Operator & Accountability", "18pts", "#ffd54f"),
+      ("Launch Structure & Token Design", "15pts", "#ff8a65"),
+      ("Activity & Momentum", "12pts", "#ce93d8"),
+      ("On-Chain Health", "8pts", "#80cbc4"),
+    ] %}
+    {% for name, pts, color in cats %}
+    <div style="padding:12px; background:var(--bg3); border-radius:7px; border:1px solid var(--border2);">
+      <div style="font-size:11px; font-weight:700; color:{{ color }}; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">{{ name }}</div>
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:800; color:var(--text);">{{ pts }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
+    {% set grades = [("A","85+","#00d4aa"),("B","70-84","#4fc3f7"),("C","55-69","#ffd54f"),("D","40-54","#ff8a65"),("F","<40","#ef5350")] %}
+    {% for g, range, color in grades %}
+    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; background:var(--bg3); border-radius:6px; border:1px solid var(--border);">
+      <span style="font-family:'IBM Plex Mono',monospace; font-weight:900; font-size:16px; color:{{ color }};">{{ g }}</span>
+      <span style="font-size:12px; color:var(--text2);">{{ range }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Recently analysed -->
+<div style="margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;">
+  <h2 style="margin:0;">Recently Analysed</h2>
+  <a href="/search" style="font-size:12px; color:var(--text2); text-decoration:none;">Search all →</a>
+</div>
+
+{% if recent %}
+  {% for p in recent %}
+  <a href="/project/{{ p.id }}" class="project-row">
+    <div>
+      <div class="project-ticker">{{ p.agent_name or p.name }}</div>
+      <div class="project-name">{{ p.name }}{% if p.token_address %} · <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text3);">{{ p.token_address[:8] }}…{{ p.token_address[-4:] }}</span>{% endif %}</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      {% if p.total_score is not none %}
+        <div style="text-align:right;">
+          <div class="project-meta">{{ p.submission_count or 1 }} submission{{ 's' if (p.submission_count or 1) != 1 else '' }}</div>
+          {% if p.confidence %}
+          <span class="conf-badge conf-{{ p.confidence }}" style="margin-top:4px;">{{ p.confidence }}</span>
+          {% endif %}
+        </div>
+        <div class="grade-badge grade-{{ p.grade }}">{{ p.grade }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:900;
+          color: {% if p.grade == 'A' %}var(--grade-a){% elif p.grade == 'B' %}var(--grade-b){% elif p.grade == 'C' %}var(--grade-c){% elif p.grade == 'D' %}var(--grade-d){% else %}var(--grade-f){% endif %};">
+          {{ p.total_score }}
+        </div>
+      {% else %}
+        <div style="font-size:12px; color:var(--text3);">Not scored</div>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+{% else %}
+  <div style="text-align:center; padding:60px 20px; color:var(--text3);">
+    <div style="font-size:32px; margin-bottom:12px;">🔍</div>
+    <div style="font-size:16px; margin-bottom:8px; color:var(--text2);">No tokens analysed yet.</div>
+    <div style="margin-bottom:24px;">Be the first to score an AI agent token.</div>
+    <a href="/scrape" class="btn btn-primary">+ Analyse Token</a>
+  </div>
+{% endif %}
+{% endblock %}

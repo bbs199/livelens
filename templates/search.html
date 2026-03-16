@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:28px;">
+  <h1>Search</h1>
+  <p class="subtitle">Find scored AI agent tokens by project name, agent name, or contract address.</p>
+</div>
+
+<form method="GET" action="/search" style="margin-bottom:28px;">
+  <div style="display:flex; gap:10px;">
+    <input
+      type="text"
+      name="q"
+      value="{{ query }}"
+      placeholder="Search by project name, agent name, or contract address..."
+      style="flex:1;"
+      autofocus
+    >
+    <button type="submit" class="btn btn-primary" style="flex-shrink:0;">Search</button>
+  </div>
+</form>
+
+{% if query %}
+  {% if results %}
+    <div style="margin-bottom:14px; font-size:12px; color:var(--text3);">
+      {{ results|length }} result{{ 's' if results|length != 1 else '' }} for <span style="color:var(--text2);">"{{ query }}"</span>
+    </div>
+    {% for p in results %}
+    <a href="/project/{{ p.id }}" class="project-row">
+      <div style="flex:1; min-width:0;">
+        <div class="project-ticker">{{ p.agent_name or p.name }}</div>
+        <div class="project-name" style="margin-top:3px;">
+          {{ p.name }}
+          {% if p.token_address %}
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text3); margin-left:8px;">
+            {{ p.token_address[:10] }}…{{ p.token_address[-6:] }}
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; flex-shrink:0;">
+        {% if p.total_score is not none %}
+          {% if p.confidence %}
+          <span class="conf-badge conf-{{ p.confidence }}">{{ p.confidence }}</span>
+          {% endif %}
+          <div class="grade-badge grade-{{ p.grade }}">{{ p.grade }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:900;
+            color: {% if p.grade == 'A' %}var(--grade-a){% elif p.grade == 'B' %}var(--grade-b){% elif p.grade == 'C' %}var(--grade-c){% elif p.grade == 'D' %}var(--grade-d){% else %}var(--grade-f){% endif %};">
+            {{ p.total_score }}
+          </div>
+        {% else %}
+          <div style="font-size:12px; color:var(--text3);">Not scored</div>
+        {% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+    <div style="text-align:center; padding:60px 20px; color:var(--text3);">
+      <div style="font-size:32px; margin-bottom:12px;">🔎</div>
+      <div style="font-size:16px; margin-bottom:8px; color:var(--text2);">No results for "{{ query }}"</div>
+      <div style="margin-bottom:24px;">Try a different name or paste a contract address.</div>
+      <a href="/scrape" class="btn btn-primary">+ Analyse Token</a>
+    </div>
+  {% endif %}
+{% else %}
+  <div style="text-align:center; padding:60px 20px; color:var(--text3);">
+    <div style="font-size:32px; margin-bottom:12px;">🔍</div>
+    <div style="font-size:16px; margin-bottom:8px; color:var(--text2);">Search for an AI agent token.</div>
+    <div>Enter a project name, agent name, or paste a Base contract address above.</div>
+  </div>
+{% endif %}
+{% endblock %}

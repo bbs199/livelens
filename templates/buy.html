@@ -1,0 +1,310 @@
+{% extends "base.html" %}
+{% block title %}Buy Credits{% endblock %}
+{% block content %}
+<div style="max-width:640px;">
+  <h1 style="margin-bottom:6px;">Buy Credits</h1>
+  <p class="subtitle">Credits work across LaunchLens and LiveLens — one balance for both tools.</p>
+
+  {% if not wallet %}
+  <div class="card" style="text-align:center; padding:48px 24px;">
+    <div style="font-size:32px; margin-bottom:16px;">🔐</div>
+    <p style="color:var(--text2); margin-bottom:20px; font-size:15px;">Connect your wallet to purchase credits.</p>
+    <button class="btn btn-primary" onclick="toggleWallet()">Connect Wallet</button>
+  </div>
+  {% else %}
+
+  <!-- Balance row -->
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:28px;
+              padding:14px 18px; background:var(--bg4); border:1px solid var(--border2);
+              border-radius:8px;">
+    <span style="color:var(--text2); font-size:13px;">Your balance:</span>
+    <span id="page-balance" style="color:var(--accent); font-family:'IBM Plex Mono',monospace;
+          font-weight:700; font-size:16px;">{{ balance }} credits</span>
+  </div>
+
+  <!-- Notes -->
+  <div style="background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+              padding:14px 16px; margin-bottom:28px; font-size:12px; color:var(--text3);
+              line-height:1.8;">
+    <div>📌 Send from the same wallet address you connected with. Payments from a different wallet will not be credited.</div>
+    <div>⏱ You have 30 minutes to complete payment after selecting a tier. After that the amount expires and you must start again.</div>
+  </div>
+
+  <!-- Tier cards -->
+  <div id="tier-section">
+    <h2 style="margin-bottom:16px;">Select a Tier</h2>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:28px;">
+
+      {% set tiers = [
+        {"credits": 50,  "price": "5.00",  "label": "Starter"},
+        {"credits": 100, "price": "10.00", "label": "Explorer"},
+        {"credits": 250, "price": "25.00", "label": "Analyst"},
+        {"credits": 500, "price": "50.00", "label": "Pro"}
+      ] %}
+
+      {% for t in tiers %}
+      <div class="card" style="margin-bottom:0; cursor:pointer; transition:border-color 0.15s; position:relative;"
+           id="tier-card-{{ loop.index0 }}"
+           onclick="selectTier({{ loop.index0 }})">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--text3);
+                    text-transform:uppercase; margin-bottom:8px;">{{ t.label }}</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:26px; font-weight:900;
+                    color:var(--accent); line-height:1;">{{ t.credits }}</div>
+        <div style="font-size:12px; color:var(--text2); margin-bottom:14px;">credits</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:700;
+                    color:var(--text); margin-bottom:16px;">${{ t.price }} USDC</div>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;"
+                onclick="event.stopPropagation(); selectTier({{ loop.index0 }})">
+          Select
+        </button>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <!-- Payment panel (hidden until tier selected) -->
+  <div id="payment-panel" style="display:none;">
+    <div class="card" style="border-color:var(--accent)40;">
+
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+        <div>
+          <h2 style="margin-bottom:4px;">Payment Instructions</h2>
+          <div id="payment-subtitle" style="font-size:13px; color:var(--text2);"></div>
+        </div>
+        <button onclick="cancelPayment()" style="background:none; border:none; color:var(--text3);
+                cursor:pointer; font-size:20px; padding:4px 8px;" title="Cancel">✕</button>
+      </div>
+
+      <!-- Unique amount -->
+      <div style="background:var(--bg3); border:1px solid var(--accent)40; border-radius:8px;
+                  padding:20px; text-align:center; margin-bottom:20px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--text3);
+                    text-transform:uppercase; margin-bottom:8px;">Send Exactly</div>
+        <div id="payment-amount" style="font-family:'IBM Plex Mono',monospace; font-size:32px;
+              font-weight:900; color:var(--accent);"></div>
+        <div style="font-size:12px; color:var(--text3); margin-top:4px;">USDC on Base network</div>
+      </div>
+
+      <!-- Receiving address + QR -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text2);
+                    text-transform:uppercase; margin-bottom:8px;">Receiving Wallet</div>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <code id="payment-address"
+                style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text);
+                       background:var(--bg3); border:1px solid var(--border2); border-radius:6px;
+                       padding:8px 12px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+                       white-space:nowrap;">0xab45d4598Ea8A8C2747AdfF8068DF08c641b42b1</code>
+          <button onclick="copyAddress()" class="btn btn-secondary" style="padding:8px 14px; font-size:12px;">
+            Copy
+          </button>
+        </div>
+        <div style="margin-top:16px; display:flex; justify-content:center;">
+          <div id="qrcode" style="padding:12px; background:#fff; border-radius:8px; display:inline-block;"></div>
+        </div>
+      </div>
+
+      <!-- Countdown -->
+      <div style="display:flex; align-items:center; gap:10px; padding:12px 16px;
+                  background:var(--bg3); border:1px solid var(--border); border-radius:7px;
+                  margin-bottom:20px;">
+        <span style="font-size:12px; color:var(--text2);">Expires in:</span>
+        <span id="countdown" style="font-family:'IBM Plex Mono',monospace; font-size:16px;
+              font-weight:700; color:var(--warn);">30:00</span>
+      </div>
+
+      <!-- Verify form -->
+      <div class="form-group" style="margin-bottom:16px;">
+        <label for="tx-hash">Transaction Hash</label>
+        <input type="text" id="tx-hash" placeholder="0x..." style="font-family:'IBM Plex Mono',monospace; font-size:12px;">
+      </div>
+
+      <button class="btn btn-primary" onclick="verifyPayment()" id="verify-btn"
+              style="width:100%; justify-content:center; font-size:14px; padding:13px;">
+        Verify Payment
+      </button>
+
+      <!-- Result messages -->
+      <div id="verify-success" style="display:none; margin-top:16px; padding:14px 16px;
+           background:#003d3020; border:1px solid #00d4aa40; border-radius:8px;
+           color:var(--accent); font-size:14px; font-weight:600; text-align:center;"></div>
+
+      <div id="verify-error" style="display:none; margin-top:16px; padding:14px 16px;
+           background:#2a080820; border:1px solid #ef535040; border-radius:8px;
+           color:var(--danger); font-size:13px;"></div>
+
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const RECEIVING_ADDR = "0xab45d4598Ea8A8C2747AdfF8068DF08c641b42b1";
+let countdownInterval = null;
+let expiresAt = null;
+let qrInstance = null;
+
+function selectTier(tierIndex) {
+  // Highlight selected card
+  for (let i = 0; i < 4; i++) {
+    const card = document.getElementById("tier-card-" + i);
+    if (card) card.style.borderColor = i === tierIndex ? "var(--accent)" : "var(--border2)";
+  }
+
+  fetch("/buy/create_order", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({tier_index: tierIndex})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.success) {
+      alert("Error: " + (data.reason || "Unknown error"));
+      return;
+    }
+    showPaymentPanel(data);
+  })
+  .catch(err => {
+    alert("Request failed: " + err.message);
+  });
+}
+
+function showPaymentPanel(order) {
+  const amountStr = order.amount_usdc + " USDC";
+  const credits   = order.credits_to_issue;
+
+  document.getElementById("payment-subtitle").textContent =
+    credits + " credits will be added after verification";
+  document.getElementById("payment-amount").textContent = order.amount_usdc + " USDC";
+
+  // QR code — encode the receiving address
+  const qrEl = document.getElementById("qrcode");
+  qrEl.innerHTML = "";
+  qrInstance = new QRCode(qrEl, {
+    text: RECEIVING_ADDR,
+    width: 140,
+    height: 140,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  // Countdown
+  expiresAt = order.expires_at;
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(tickCountdown, 1000);
+  tickCountdown();
+
+  // Clear old state
+  document.getElementById("tx-hash").value = "";
+  document.getElementById("verify-success").style.display = "none";
+  document.getElementById("verify-error").style.display   = "none";
+  document.getElementById("verify-btn").disabled = false;
+  document.getElementById("verify-btn").textContent = "Verify Payment";
+
+  // Show panel, scroll into view
+  document.getElementById("payment-panel").style.display = "block";
+  document.getElementById("tier-section").style.display  = "none";
+  document.getElementById("payment-panel").scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+function tickCountdown() {
+  if (!expiresAt) return;
+  const remaining = expiresAt - Math.floor(Date.now() / 1000);
+  if (remaining <= 0) {
+    clearInterval(countdownInterval);
+    document.getElementById("countdown").textContent = "EXPIRED";
+    document.getElementById("countdown").style.color = "var(--danger)";
+    document.getElementById("verify-btn").disabled = true;
+    document.getElementById("verify-btn").textContent = "Order Expired — Select a New Tier";
+    return;
+  }
+  const m = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const s = String(remaining % 60).padStart(2, "0");
+  document.getElementById("countdown").textContent = m + ":" + s;
+  document.getElementById("countdown").style.color = remaining < 120 ? "var(--danger)" : "var(--warn)";
+}
+
+function cancelPayment() {
+  clearInterval(countdownInterval);
+  document.getElementById("payment-panel").style.display = "none";
+  document.getElementById("tier-section").style.display  = "block";
+  // Reset card highlights
+  for (let i = 0; i < 4; i++) {
+    const card = document.getElementById("tier-card-" + i);
+    if (card) card.style.borderColor = "var(--border2)";
+  }
+}
+
+function copyAddress() {
+  navigator.clipboard.writeText(RECEIVING_ADDR).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = "Copied!";
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function verifyPayment() {
+  const txHash = document.getElementById("tx-hash").value.trim();
+  if (!txHash) {
+    document.getElementById("verify-error").style.display = "block";
+    document.getElementById("verify-error").textContent = "Enter your transaction hash first.";
+    return;
+  }
+
+  const btn = document.getElementById("verify-btn");
+  btn.disabled = true;
+  btn.textContent = "Verifying…";
+  document.getElementById("verify-success").style.display = "none";
+  document.getElementById("verify-error").style.display   = "none";
+
+  fetch("/buy/verify", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({tx_hash: txHash})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      clearInterval(countdownInterval);
+
+      const creditsAdded = data.credits_added || data.credits || "?";
+      const successEl = document.getElementById("verify-success");
+      successEl.textContent = "✅ " + creditsAdded + " credits added to your wallet!";
+      successEl.style.display = "block";
+
+      btn.textContent = "Payment Confirmed";
+
+      // Update nav + page balance
+      fetch("/api/balance")
+        .then(r => r.json())
+        .then(bal => {
+          if (bal.connected) {
+            const navEl = document.getElementById("nav-credit-balance");
+            if (navEl) navEl.textContent = bal.balance;
+            const pageEl = document.getElementById("page-balance");
+            if (pageEl) pageEl.textContent = bal.balance + " credits";
+          }
+        });
+    } else {
+      btn.disabled = false;
+      btn.textContent = "Verify Payment";
+      const errEl = document.getElementById("verify-error");
+      errEl.textContent = "❌ " + (data.reason || "Verification failed. Try again.");
+      errEl.style.display = "block";
+    }
+  })
+  .catch(err => {
+    btn.disabled = false;
+    btn.textContent = "Verify Payment";
+    const errEl = document.getElementById("verify-error");
+    errEl.textContent = "❌ Request error: " + err.message;
+    errEl.style.display = "block";
+  });
+}
+</script>
+{% endblock %}

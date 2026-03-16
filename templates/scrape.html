@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Analyse a Token{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;">
+
+  <div style="margin-bottom:28px;">
+    <h1>Analyse a Token</h1>
+    <p class="subtitle">Paste a project blurb, announcement, or token description — with any links. LiveLens will extract what it can and pre-fill the scoring form.</p>
+  </div>
+
+  {% if error %}
+  <div style="padding:14px 16px; background:#2a08082a; border:1px solid #ef535060; border-radius:8px; color:#ffaaaa; font-size:13px; margin-bottom:20px;">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <div id="loading-screen" style="display:none; text-align:center; padding:60px 20px;">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--accent); margin-bottom:24px; letter-spacing:0.1em;">
+      ANALYSING PROJECT
+    </div>
+    <div style="width:100%; max-width:400px; margin:0 auto 24px; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden;">
+      <div id="progress-bar" style="height:100%; width:0%; background:var(--accent); border-radius:2px; transition:width 0.5s ease;"></div>
+    </div>
+    <div id="progress-label" style="font-size:12px; color:var(--text2); margin-bottom:8px;">Fetching project pages...</div>
+    <div style="font-size:11px; color:var(--text3);">This takes 45–90 seconds. Do not refresh.</div>
+  </div>
+
+  <div id="scrape-form">
+  <form method="POST" action="/scrape">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-accent"></div>
+        <h2 style="margin:0;">Paste Project Info</h2>
+      </div>
+
+      <div class="form-group">
+        <label>Project Blurb, Announcement, or Token Description</label>
+        <div class="field-hint">Include any links — website, docs, DexScreener, BaseScan. The more you paste, the more we can extract automatically.</div>
+        <textarea
+          name="blurb"
+          rows="14"
+          placeholder="Paste project description, announcement, or any text with links here...
+
+Example:
+Felix is an AI agent operating as CEO of The Masinov Company.
+Products: How to Hire an AI guide ($29), Done-For-You OpenClaw Setup ($2,499).
+Token: $FELIX on Base. CA: 0xf30Bf00...
+Website: https://felixcraft.ai
+Operator: Nat Eliason"
+          style="font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.6; resize:vertical;"
+        ></textarea>
+      </div>
+
+      <!-- What gets extracted -->
+      <div style="padding:14px; background:var(--bg3); border-radius:7px; border:1px solid var(--border); margin-bottom:20px;">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; color:var(--text2); text-transform:uppercase; margin-bottom:10px;">What LiveLens extracts automatically</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+          {% set extractable = [
+            ("Project name and ticker", True),
+            ("Contract address and launch platform", True),
+            ("Agent name and operator identity", True),
+            ("Revenue streams and dashboard URLs", True),
+            ("Products and pricing", True),
+            ("LP lock status", True),
+            ("On-chain metrics (mcap, volume, holders)", True),
+            ("Dev wallet behaviour", False),
+            ("Smart contract audit status", False),
+            ("Historical rug/fraud data", False),
+          ] %}
+          {% for label, can_extract in extractable %}
+          <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:{% if can_extract %}var(--text2){% else %}var(--text3){% endif %};">
+            <span style="color:{% if can_extract %}var(--accent){% else %}#445566{% endif %}; font-size:11px;">{% if can_extract %}✓{% else %}✗{% endif %}</span>
+            {{ label }}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Credit notice -->
+      <div id="credit-notice" style="padding:12px 14px; background:#2a220020; border:1px solid #ffd54f40; border-radius:7px; color:var(--warn); font-size:12px; margin-bottom:16px; display:none;">
+        ⚠️ No credits remaining. Scoring will use your free daily query.
+      </div>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="font-size:12px; color:var(--text3); line-height:1.6;">
+          Missing fields will be flagged for manual input on the next screen.<br>
+          You can also <a href="/analyse" style="color:var(--accent); text-decoration:none;">skip this and fill in manually →</a>
+        </div>
+        <button type="submit" class="btn btn-primary" style="flex-shrink:0;">
+          Extract & Pre-fill →
+        </button>
+      </div>
+    </div>
+  </form>
+  </div>
+
+</div>
+
+<script>
+fetch("/api/balance").then(r=>r.json()).then(data=>{
+  if (data.connected && data.balance === 0) {
+    document.getElementById("credit-notice").style.display = "block";
+  }
+});
+
+document.querySelector('form').addEventListener('submit', function() {
+  document.getElementById('scrape-form').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'block';
+  startProgress();
+});
+
+function startProgress() {
+  const steps = [
+    [5,  "Fetching project pages..."],
+    [20, "Running data extraction..."],
+    [40, "Researching operator and revenue..."],
+    [60, "Searching for on-chain data..."],
+    [75, "Scoring project..."],
+    [88, "Generating analyst report..."],
+    [95, "Almost done..."],
+  ];
+  let i = 0;
+  const bar   = document.getElementById('progress-bar');
+  const label = document.getElementById('progress-label');
+
+  function nextStep() {
+    if (i >= steps.length) return;
+    const [pct, text] = steps[i];
+    bar.style.width    = pct + '%';
+    label.textContent  = text;
+    i++;
+    const delay = i === 1 ? 1000 : i === 2 ? 4000 : i === 3 ? 10000 : i === 4 ? 15000 : i === 5 ? 10000 : 8000;
+    setTimeout(nextStep, delay);
+  }
+  nextStep();
+}
+</script>
+{% endblock %}
