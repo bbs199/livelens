@@ -280,6 +280,111 @@
 </div>
 {% endif %}
 
+<!-- Tweet Generator -->
+<div style="border:1px solid var(--bg3); border-radius:8px; padding:20px; margin:24px 0;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div>
+      <div style="font-size:14px; font-weight:600; color:var(--text1);">Generate Tweet</div>
+      <div style="font-size:12px; color:var(--text3); margin-top:2px;">Get a unique analyst take on this token — costs 2 credits</div>
+    </div>
+    <button id="tweet-btn" onclick="generateTweet()" style="background:var(--accent); color:#000; border:none; border-radius:6px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer;">
+      Generate (2 credits)
+    </button>
+  </div>
+  <div id="tweet-output" style="display:none;">
+    <div id="tweet-text" style="background:var(--bg2); border-radius:6px; padding:14px 16px; font-size:14px; line-height:1.5; color:var(--text1); white-space:pre-wrap; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:8px;">
+      <button onclick="copyTweet()" style="background:var(--bg3); color:var(--text1); border:none; border-radius:6px; padding:6px 14px; font-size:12px; cursor:pointer;">Copy</button>
+      <button onclick="openInX()" style="background:#000; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:12px; cursor:pointer;">Post Tweet 1 on X</button>
+      <span style="font-size:11px; color:var(--text3); margin-left:8px;">Posts tweet 1 — reply with 2/, 3/, 4/ to complete the thread</span>
+    </div>
+  </div>
+  <div id="tweet-error" style="display:none; color:#e53e3e; font-size:12px; margin-top:8px;"></div>
+</div>
+
+<!-- Share Card -->
+{% set project_name = project.agent_name or project.name %}
+{% set token_address = project.token_address or "" %}
+<div style="border:1px solid var(--bg3); border-radius:8px; padding:20px; margin:24px 0;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <div>
+      <div style="font-size:14px; font-weight:600; color:var(--text1);">Share Score Card</div>
+      <div style="font-size:12px; color:var(--text3); margin-top:2px;">Generate a visual card to share on X — free</div>
+    </div>
+    <button onclick="shareCard()" style="background:var(--bg3); color:var(--text1); border:1px solid var(--bg3); border-radius:6px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer;">
+      Share to X
+    </button>
+  </div>
+
+  <!-- The card that gets captured -->
+  <div id="share-card" style="
+    background: linear-gradient(135deg, #0a0a0f 0%, #111118 100%);
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 480px;
+    font-family: 'IBM Plex Mono', monospace;
+    display: none;
+  ">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+      <div>
+        <div style="font-size:11px; color:#666; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:4px;">LiveLens Analysis</div>
+        <div style="font-size:20px; font-weight:700; color:#fff;">{{ project_name }}</div>
+        {% if token_address %}
+        <div style="font-size:11px; color:#666; margin-top:2px;">{{ token_address[:6] }}...{{ token_address[-4:] }} · Base</div>
+        {% endif %}
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:48px; font-weight:700; color:{{ score_color }}; line-height:1;">{{ score }}</div>
+        <div style="font-size:13px; color:#666;">/ 100 · Grade {{ grade }}</div>
+      </div>
+    </div>
+
+    <!-- Score bar -->
+    <div style="background:#1a1a2a; border-radius:4px; height:6px; margin-bottom:16px;">
+      <div style="width:{{ score }}%; background:{{ score_color }}; border-radius:4px; height:6px;"></div>
+    </div>
+
+    <!-- Category grid (first 6) -->
+    {% set max_map = {
+      "Revenue Existence": 10, "Value Accrual": 8, "Treasury Transparency": 7,
+      "Agent Existence": 10, "Product Reality": 8, "Technical Sophistication": 4,
+      "Operator Identity": 8, "Skin in the Game": 6, "Launch Platform & LP": 7,
+      "Supply Distribution": 4, "Mechanic Sustainability": 4, "Shipping Cadence": 5,
+      "Community Engagement": 4, "Ecosystem Integration": 3,
+      "Volume/MCap Ratio": 3, "Holder Distribution": 3, "Price Trend": 2
+    } %}
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
+      {% for cat_name, pts in r.category_scores.items() | list %}{% if loop.index <= 6 %}
+      {% set max_pts = max_map.get(cat_name, 10) %}
+      {% set pct = (pts / max_pts * 100) | int %}
+      {% if pct >= 70 %}{% set cat_color = "#16a34a" %}
+      {% elif pct >= 40 %}{% set cat_color = "#d97706" %}
+      {% else %}{% set cat_color = "#e53e3e" %}{% endif %}
+      <div style="background:#1a1a2a; border-radius:6px; padding:8px 10px;">
+        <div style="font-size:9px; color:#666; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.05em;">{{ cat_name | truncate(14, true, '') }}</div>
+        <div style="font-size:14px; font-weight:700; color:{{ cat_color }};">{{ pts }}/{{ max_pts }}</div>
+      </div>
+      {% endif %}{% endfor %}
+    </div>
+
+    <!-- Footer -->
+    <div style="border-top:1px solid #2a2a3a; padding-top:12px; display:flex; justify-content:space-between; align-items:center;">
+      <div style="font-size:11px; color:#666;">{{ r.confidence | upper }} CONFIDENCE · {{ sub_count }} submission{{ 's' if sub_count != 1 else '' }}</div>
+      <div style="font-size:11px; color:#666;">livelens.cminsights.ai</div>
+    </div>
+  </div>
+
+  <div id="card-actions" style="display:none; gap:8px; margin-top:12px;">
+    <button onclick="downloadCard()" style="background:var(--accent); color:#000; border:none; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer;">
+      Download PNG
+    </button>
+    <button onclick="openTweetIntent()" style="background:#000; color:#fff; border:1px solid #333; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer;">
+      Tweet (attach image manually)
+    </button>
+  </div>
+</div>
+
 <!-- Category Breakdown -->
 <div class="card" style="margin-bottom:24px;">
   <div class="card-header">
@@ -394,4 +499,98 @@
   <a href="/analyse?project_id={{ project.id }}" class="btn btn-primary">Add Data →</a>
 </div>
 
+<script>
+function generateTweet() {
+  const btn    = document.getElementById('tweet-btn');
+  const output = document.getElementById('tweet-output');
+  const error  = document.getElementById('tweet-error');
+  const textEl = document.getElementById('tweet-text');
+
+  btn.textContent      = 'Generating...';
+  btn.disabled         = true;
+  output.style.display = 'none';
+  error.style.display  = 'none';
+
+  fetch('/project/{{ project.id }}/tweet', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        error.textContent = data.error === 'insufficient_credits'
+          ? 'Not enough credits. Buy more to generate tweets.'
+          : 'Failed to generate tweet. Try again.';
+        error.style.display = 'block';
+        btn.textContent = 'Generate (2 credits)';
+        btn.disabled = false;
+      } else {
+        textEl.textContent   = data.tweet;
+        output.style.display = 'block';
+        btn.textContent      = 'Regenerate (2 credits)';
+        btn.disabled         = false;
+        const balEl = document.getElementById('credit-balance');
+        if (balEl && data.credits_remaining !== undefined) {
+          balEl.textContent = data.credits_remaining;
+        }
+      }
+    })
+    .catch(() => {
+      error.textContent   = 'Network error. Try again.';
+      error.style.display = 'block';
+      btn.textContent     = 'Generate (2 credits)';
+      btn.disabled        = false;
+    });
+}
+
+function copyTweet() {
+  const text = document.getElementById('tweet-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+function shareCard() {
+  const card = document.getElementById('share-card');
+  const btn  = document.querySelector('[onclick="shareCard()"]');
+
+  if (card.style.display === 'none' || card.style.display === '') {
+    card.style.display = 'block';
+    btn.textContent = 'Hide Card';
+    document.getElementById('card-actions').style.display = 'flex';
+  } else {
+    card.style.display = 'none';
+    btn.textContent = 'Share to X';
+    document.getElementById('card-actions').style.display = 'none';
+  }
+}
+
+function downloadCard() {
+  const card = document.getElementById('share-card');
+  html2canvas(card, {
+    backgroundColor: '#0a0a0f',
+    scale: 2,
+    useCORS: true,
+    logging: false
+  }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = '{{ project_name }}-livelens.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+}
+
+function openTweetIntent() {
+  const text = encodeURIComponent('{{ project_name }} scored {{ score }}/100 (Grade {{ grade }}) on LiveLens\n\nlivelens.cminsights.ai');
+  window.open('https://twitter.com/intent/tweet?text=' + text, '_blank');
+}
+
+function openInX() {
+  const full = document.getElementById('tweet-text').textContent;
+  // Extract just the first tweet (up to the second \n\n or "2/")
+  const parts = full.split(/\n\n(?=\d\/)/);
+  const firstTweet = parts[0] || full;
+  const text = encodeURIComponent(firstTweet.trim());
+  window.open('https://twitter.com/intent/tweet?text=' + text, '_blank');
+}
+</script>
 {% endblock %}

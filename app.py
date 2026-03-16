@@ -395,6 +395,47 @@ def api_score_by_address(contract_address):
 
 
 # ─────────────────────────────────────────────────────────────
+# TWEET GENERATOR
+# ─────────────────────────────────────────────────────────────
+
+@app.route("/project/<int:project_id>/tweet", methods=["POST"])
+def generate_tweet_route(project_id):
+    wallet = session.get("wallet")
+    if not wallet:
+        return jsonify({"error": "wallet_required"}), 401
+
+    # Check and deduct 2 credits
+    credit_result = credits_module.check_and_use_credit(wallet, 2)
+    if not credit_result.get("allowed"):
+        return jsonify({"error": "insufficient_credits", "balance": credit_result.get("balance", 0)}), 402
+
+    project = get_project_by_id(project_id)
+    if not project:
+        return jsonify({"error": "project_not_found"}), 404
+
+    score_row = get_latest_score(project_id)
+    if not score_row:
+        return jsonify({"error": "no_score"}), 404
+
+    result      = score_row.get("result", {})
+    merged_data = score_row.get("merged_data", {}) or {}
+
+    from reporter import generate_tweet
+    try:
+        tweet = generate_tweet(
+            project_name=project.get("agent_name") or project.get("name", "Unknown"),
+            score=result.get("total_score", 0),
+            grade=result.get("grade", "F"),
+            score_result=result,
+            merged_data=merged_data,
+        )
+        return jsonify({"tweet": tweet, "credits_remaining": credit_result.get("balance", 0)})
+    except Exception as e:
+        app.logger.error(f"Tweet generation failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────────────────────
 # ENTRY POINT
 # ─────────────────────────────────────────────────────────────
 

@@ -266,6 +266,97 @@ Return a JSON object with exactly these five keys:
 
 
 # ─────────────────────────────────────────────────────────────
+# TWEET GENERATOR
+# ─────────────────────────────────────────────────────────────
+
+def generate_tweet(project_name: str, score: int, grade: str, score_result: dict, merged_data: dict) -> str:
+    import random
+
+    angles = [
+        "focus on the revenue story and whether token holders actually benefit",
+        "focus on the operator — who they are and whether they have skin in the game",
+        "focus on the contrast between what the project claims and what the data shows",
+        "focus on the biggest risk and what would have to change to improve the score",
+        "focus on the technical infrastructure and whether the agent is real or vaporware",
+        "focus on the tokenomics — launch structure, supply, LP, and value accrual",
+    ]
+    angle = random.choice(angles)
+
+    sub_scores = score_result.get("sub_scores", {})
+    categories = []
+    for cat, ss in sub_scores.items():
+        pts     = ss.get("points", 0)     if isinstance(ss, dict) else getattr(ss, "points", 0)
+        max_pts = ss.get("max_points", 1) if isinstance(ss, dict) else getattr(ss, "max_points", 1)
+        pct     = round(pts / max_pts * 100) if max_pts > 0 else 0
+        categories.append((cat, pts, max_pts, pct))
+
+    categories.sort(key=lambda x: x[3], reverse=True)
+    top3    = categories[:3]
+    bottom3 = categories[-3:]
+
+    flags      = score_result.get("red_flags", [])
+    flag_texts = [f.get("text", "") if isinstance(f, dict) else str(f) for f in flags[:3]]
+
+    operator         = merged_data.get("operator_name", "Unknown")
+    revenue_verified = merged_data.get("revenue_verified", False)
+    lp_locked        = merged_data.get("lp_locked", False)
+    launch           = merged_data.get("launch_platform", "unknown")
+    mcap             = merged_data.get("market_cap_usd")
+    volume           = merged_data.get("volume_24h_usd")
+    products         = merged_data.get("product_count_live", 0)
+    ticker           = merged_data.get("ticker", project_name.upper())
+
+    mcap_str = f"${mcap/1e6:.1f}M mcap" if mcap else "unknown mcap"
+    vol_str  = f"${volume/1e3:.0f}K 24h vol" if volume else "unknown volume"
+
+    prompt = f"""You are a sharp crypto analyst writing a Twitter thread about an AI agent token you just scored.
+
+TOKEN: {project_name} (${ticker})
+SCORE: {score}/100 — Grade {grade}
+MARKET: {mcap_str}, {vol_str}
+OPERATOR: {operator}
+REVENUE VERIFIED: {revenue_verified}
+LP LOCKED: {lp_locked}
+LAUNCH: {launch}
+LIVE PRODUCTS: {products}
+
+STRONGEST CATEGORIES:
+{chr(10).join(f"- {c[0]}: {c[1]}/{c[2]} ({c[3]}%)" for c in top3)}
+
+WEAKEST CATEGORIES:
+{chr(10).join(f"- {c[0]}: {c[1]}/{c[2]} ({c[3]}%)" for c in bottom3)}
+
+FLAGS:
+{chr(10).join(f"- {f}" for f in flag_texts) if flag_texts else "- None"}
+
+ANGLE FOR THIS THREAD: {angle}
+
+Write a Twitter thread of exactly 4 tweets. Format like this:
+
+1/ [First tweet — hook, score, overall verdict. Max 260 chars]
+
+2/ [Second tweet — dive into the strongest aspect with specific numbers. Max 260 chars]
+
+3/ [Third tweet — the key weakness or risk with specific numbers. Max 260 chars]
+
+4/ [Fourth tweet — verdict and what would change the score. End with ${ticker}. Max 260 chars]
+
+Rules:
+- Write like a degen crypto trader on CT — casual, punchy, opinionated
+- Use emojis naturally — 🔥 for hot takes, ⚠️ for risks, ✅ for green flags, 🚨 for red flags, 📊 for data
+- Use bullet points with emojis inside tweets where it helps readability
+- Short sentences. Fragments are fine.
+- Crypto slang is good — ngmi, gm, lfg, ser, anon, probably nothing, have fun staying poor, etc — use sparingly and only where it lands
+- Numbers should be formatted like degens write them — $3.2M not $3,200,000, 77/100 not seventy-seven
+- Each tweet should feel like it was fired off by someone who actually trades this stuff
+- Opinions should be strong — don't hedge everything
+- Make the hook tweet impossible to scroll past
+- Return only the 4 tweets in the format above, nothing else"""
+
+    return _call_claude(prompt, SYSTEM_PROMPT, max_tokens=500)
+
+
+# ─────────────────────────────────────────────────────────────
 # STANDALONE TEST
 # ─────────────────────────────────────────────────────────────
 
